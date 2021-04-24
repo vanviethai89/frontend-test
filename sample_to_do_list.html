@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Todo list - app</title>
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet">
+
+    <style type="text/css">
+        * {
+            box-sizing: border-box;
+            font-family: 'Open Sans', sans-serif;
+        }
+        body {
+            background-color: #F5F5F5;
+            font-family: 'Open Sans', sans-serif;
+            color: #4d4d4d;
+        }
+
+        #myDiv {
+            background-color: #fff;
+            margin: 15px auto;
+            padding: 15px;
+            width: 500px;
+            box-sizing: border-box;
+        }
+
+        #myDiv h2 {
+            text-align: center;
+            margin: 0 0 25px 0;
+        }
+
+        #myInput {
+            padding: 14px;
+            background: rgba(0, 0, 0, 0.003);
+            font-size: 18px;
+            border: 1px solid #e6e6e6;
+            width: 100%;
+        }
+
+        #myInput:focus {
+            border-color: #bbbaba;
+            outline: 0;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        #myUL li {
+            position: relative;
+            font-size: 18px;
+            border-bottom: 1px solid #ededed;
+            padding: 20px 30px 20px 15px;
+            word-break: break-all;
+            cursor: pointer;
+            transition: color 0.2s ease-out;
+        }
+
+        #myUL li:last-child {
+            border-bottom: none;
+        }
+
+        #myUL li.checked {
+            text-decoration: line-through;
+            color: #d9d9d9;
+        }
+
+        #myUL li .close {
+            position: absolute;
+            right: 0px;
+            cursor: pointer;
+            top: 50%;
+            margin-top: -15px;
+            font-size: 20px;
+            width: 30px;
+            height: 30px;
+            color: #cc9a9a;
+            line-height: 30px;
+            text-align: center;
+        }
+
+        #myUL li .close:hover {
+            color: #af5b5e;
+        }
+
+        .notification {
+            position: fixed;
+            right: 0;
+            bottom: 0;
+        }
+
+        .notification .item {
+            padding: 15px;
+            margin: 15px;
+        }
+
+        .notification .item.error {
+            color: #721c24;
+            background-color: #f8d7da;
+            border-color: #f5c6cb;
+        }
+
+        .notification .item.info {
+            color: #004085;
+            background-color: #cce5ff;
+            border-color: #b8daff;
+        }
+
+        .notification .item.success {
+            color: #155724;
+            background-color: #d4edda;
+            border-color: #c3e6cb;
+        }
+    </style>
+</head>
+<body>
+
+<script>
+    const Storage = (function () {
+        const STORAGE_KEY = 'todo_items';
+
+        function pushItem(item) {
+            const items = getAllItems();
+
+            const count = items.push(item);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+
+            return count;
+        }
+
+        function getAllItems() {
+            const items = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+
+            return items;
+        }
+
+        function setItem(index, item) {
+            const items = getAllItems();
+
+            items[index] = item;
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        }
+
+        function getItemByIndex(index) {
+            const items = getAllItems();
+
+            return items[index];
+        }
+
+        function deleteItem(index) {
+            const items = getAllItems();
+            items.splice(index, 1);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        }
+
+        return {
+            getItemByIndex,
+            getAllItems,
+            pushItem,
+            setItem,
+            deleteItem
+        };
+    })();
+
+    const Notification = (function () {
+        function showNotification(message, className) {
+            const div = document.createElement("div");
+            div.className=`item ${className}`;
+            div.append(
+                document.createTextNode(message)
+            );
+
+            var notificationListElem = document.getElementById('notification');
+
+            if (!notificationListElem) {
+                notificationListElem = document.createElement('div');
+                notificationListElem.className = 'notification';
+                notificationListElem.id = 'notification';
+                document.body.appendChild(notificationListElem);
+            }
+
+            notificationListElem.appendChild(div);
+
+            setTimeout(function () {
+                notificationListElem.removeChild(div);
+            }, 5000);
+        }
+
+        function info(message) {
+            showNotification(message, 'info');
+        }
+
+        function error(message) {
+            showNotification(message, 'error');
+        }
+
+        function success(message) {
+            showNotification(message, 'success');
+        }
+
+        return {
+            info,
+            error,
+            success
+        }
+    })();
+
+    const TodoApp = (function () {
+        var runned = false;
+
+        function init() {
+            const div = document.createElement("div");
+            div.classname="header";
+            div.id="myDiv";
+            document.body.appendChild(div);
+
+            // Create heading & append to div
+            const h2 = document.createElement("h2");
+            h2.innerText = "My to-do list";
+            div.appendChild(h2);
+
+            // Create input & append to div
+            const input = document.createElement("input");
+            input.type = "text";
+            input.id = "myInput";
+            input.onkeyup = function (e) {
+                if (e.key !== 'Enter' && e.keyCode !== 13) {
+                    return;
+                }
+
+                const val = document.getElementById("myInput").value;
+                if (!val) {
+                    return Notification.error("You must write something!");
+                }
+
+                addItem(val);
+
+                document.getElementById("myInput").value = '';
+            };
+            div.appendChild(input);
+
+            // Create todoList & append to div
+            const ul = document.createElement("ul");
+            ul.id = "myUL";
+            ul.addEventListener('click', function(ev) {
+                if (ev.target.tagName == 'LI') {
+                    toggleComplete(ev.target.getAttribute('data-index'));
+                }
+            }, false);
+            div.appendChild(ul);
+        }
+
+        function addItem(name) {
+            const id = (function() {
+                let d = new Date().getTime();
+                return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                    const r = (d + Math.random() * 16) % 16 | 0;
+                    d = Math.floor(d / 16);
+                    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+                });
+            })();
+
+            const count = Storage.pushItem({
+                id: id,
+                completed: false,
+                name: name
+            });
+
+            setTimeout(function () {
+                const items = Storage.getAllItems();
+
+                const foundItem = items.find((item) => {
+                   return item.id === id;
+                });
+
+                foundItem && !foundItem.completed && Notification.info("You haven't done the task '" + foundItem.name + "'!");
+            }, 6e4)
+
+            reRender();
+        }
+
+        function toggleComplete(index) {
+            const item = Storage.getItemByIndex(index);
+            item.completed = !item.completed;
+            Storage.setItem(index, item);
+            reRender();
+        }
+
+        function removeItem(index) {
+            Storage.deleteItem(index);
+            reRender();
+        }
+
+        function render() {
+            const items = Storage.getAllItems();
+
+            for (var i in items) {
+                renderItem(i, items[i]);
+            }
+        }
+
+        function reRender() {
+            const ul = document.getElementById('myUL');
+
+            // Clear all items
+            ul.innerHTML = '';
+
+            const items = Storage.getAllItems();
+
+            for (var i in items) {
+                renderItem(i, items[i]);
+            }
+        }
+
+        function renderItem(index, item) {
+            const todoListElem = document.getElementById('myUL');
+
+            // Create li element
+            const liElem = document.createElement("li");
+            liElem.append(
+                document.createTextNode(item.name)
+            );
+            liElem.className = item.completed ? 'checked' : '';
+            liElem.setAttribute('data-index', index);
+
+            // Create & append closeBtn to li element
+            const closeElem = document.createElement("SPAN");
+            closeElem.append(
+                document.createTextNode("×")
+            );
+            closeElem.className = 'close';
+            liElem.append(closeElem);
+
+            // Bind event click for close btn
+            closeElem.onclick = () => {
+                removeItem(index);
+            };
+
+            // Append li to ul
+            todoListElem.append(liElem);
+        }
+
+        function run() {
+            if (!runned) {
+                runned = true;
+
+                init();
+                render();
+            }
+        }
+
+        return {
+            run
+        }
+    }) ();
+
+    TodoApp.run();
+</script>
+</body>
+</html>
